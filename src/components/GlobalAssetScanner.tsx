@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Filter, Globe, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
+import { assetAPI, type Asset as APIAsset } from "../utils/api/client";
 
 interface Asset {
   id: string;
@@ -14,116 +15,61 @@ interface Asset {
   taxRate: number;
 }
 
-const mockAssets: Asset[] = [
-  {
-    id: "1",
-    name: "Oando Plc",
-    type: "Equity",
-    jurisdiction: "Nigeria",
-    value: 18500,
+// Transform API asset to display format
+function transformAsset(apiAsset: APIAsset): Asset {
+  return {
+    id: apiAsset.id,
+    name: apiAsset.description,
+    type: apiAsset.asset_type,
+    jurisdiction: apiAsset.country,
+    value: apiAsset.value_gbp,
     currency: "GBP",
-    acquisitionDate: "2022-03-15",
-    currentGain: 4200,
-    status: "flagged",
-    taxRate: 10,
-  },
-  {
-    id: "2",
-    name: "Dangote Cement",
-    type: "Equity",
-    jurisdiction: "Nigeria",
-    value: 12300,
-    currency: "GBP",
-    acquisitionDate: "2021-08-20",
-    currentGain: 2800,
+    acquisitionDate: apiAsset.acquisition_date || new Date().toISOString().split('T')[0],
+    currentGain: 0, // TODO: Calculate from historical data
     status: "verified",
-    taxRate: 10,
-  },
-  {
-    id: "3",
-    name: "GTBank Plc",
-    type: "Equity",
-    jurisdiction: "Nigeria",
-    value: 6700,
-    currency: "GBP",
-    acquisitionDate: "2023-01-10",
-    currentGain: -420,
-    status: "verified",
-    taxRate: 10,
-  },
-  {
-    id: "4",
-    name: "FTSE 100 Index Fund",
-    type: "Fund",
-    jurisdiction: "United Kingdom",
-    value: 45000,
-    currency: "GBP",
-    acquisitionDate: "2020-06-01",
-    currentGain: 12300,
-    status: "verified",
-    taxRate: 20,
-  },
-  {
-    id: "5",
-    name: "Vanguard S&P 500 ETF",
-    type: "ETF",
-    jurisdiction: "United States",
-    value: 38200,
-    currency: "GBP",
-    acquisitionDate: "2021-02-15",
-    currentGain: 8900,
-    status: "verified",
-    taxRate: 20,
-  },
-  {
-    id: "6",
-    name: "Apple Inc.",
-    type: "Equity",
-    jurisdiction: "United States",
-    value: 17920,
-    currency: "GBP",
-    acquisitionDate: "2022-09-01",
-    currentGain: 3420,
-    status: "pending",
-    taxRate: 20,
-  },
-  {
-    id: "7",
-    name: "Dubai Property Investment",
-    type: "Real Estate",
-    jurisdiction: "UAE",
-    value: 85000,
-    currency: "GBP",
-    acquisitionDate: "2019-11-20",
-    currentGain: 15000,
-    status: "verified",
-    taxRate: 0,
-  },
-  {
-    id: "8",
-    name: "Indian Mutual Fund",
-    type: "Fund",
-    jurisdiction: "India",
-    value: 9340,
-    currency: "GBP",
-    acquisitionDate: "2023-04-12",
-    currentGain: 1240,
-    status: "pending",
-    taxRate: 15,
-  },
-];
+    taxRate: apiAsset.tax_paid_locally,
+  };
+}
 
 export const GlobalAssetScanner: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("all");
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch assets from API
+  useEffect(() => {
+    async function fetchAssets() {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error: apiError } = await assetAPI.getAll();
+      
+      if (apiError) {
+        console.error("Error fetching assets:", apiError);
+        setError("Failed to load assets. Please try again.");
+        setAssets([]);
+      } else if (data?.assets) {
+        const transformedAssets = data.assets.map(transformAsset);
+        setAssets(transformedAssets);
+      } else {
+        setAssets([]);
+      }
+      
+      setLoading(false);
+    }
+
+    fetchAssets();
+  }, []);
 
   const jurisdictions = [
     "all",
-    ...Array.from(new Set(mockAssets.map((a) => a.jurisdiction))),
+    ...Array.from(new Set(assets.map((a) => a.jurisdiction))),
   ];
 
-  const filteredAssets = mockAssets.filter((asset) => {
+  const filteredAssets = assets.filter((asset) => {
     const matchesSearch =
       asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       asset.type.toLowerCase().includes(searchQuery.toLowerCase());

@@ -683,6 +683,161 @@ app.get("/make-server-b5fd51b8/tax/history", verifyAuth, async (c) => {
 // DOCUMENT ROUTES
 // ==============================================
 
+// Upload a document with file storage
+app.post("/make-server-b5fd51b8/documents/upload", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    const formData = await c.req.formData();
+    
+    const file = formData.get("file") as File;
+    const documentType = formData.get("documentType") as string;
+    const assetId = formData.get("assetId") as string | null;
+    
+    if (!file) {
+      return c.json({ error: "No file provided" }, 400);
+    }
+    
+    // Validate file type
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "text/csv"];
+    if (!allowedTypes.includes(file.type)) {
+      return c.json({ error: "Invalid file type. Only PDF, JPG, PNG, and CSV are allowed." }, 400);
+    }
+    
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return c.json({ error: "File too large. Maximum size is 10MB." }, 400);
+    }
+    
+    // Create unique file path
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("make-b5fd51b8-documents")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+    
+    if (uploadError) {
+      console.error("Error uploading file to storage:", uploadError);
+      return c.json({ error: "Failed to upload file" }, 500);
+    }
+    
+    // Save document metadata to database
+    const { data: document, error: dbError } = await supabase
+      .from("documents")
+      .insert({
+        user_id: userId,
+        asset_id: assetId || null,
+        document_type: documentType || "other",
+        file_name: file.name,
+        file_path: uploadData.path,
+        file_size: file.size,
+        upload_date: new Date().toISOString(),
+        ocr_status: "pending",
+      })
+      .select()
+      .single();
+    
+    if (dbError) {
+      console.error("Error saving document metadata:", dbError);
+      // Cleanup: delete uploaded file
+      await supabase.storage.from("make-b5fd51b8-documents").remove([fileName]);
+      return c.json({ error: "Failed to save document metadata" }, 500);
+    }
+    
+    return c.json({ document, message: "Document uploaded successfully" });
+  } catch (error) {
+    console.error("Unexpected error in POST /documents/upload:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Get signed URL for a document
+app.get("/make-server-b5fd51b8/documents/:id/url", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    const documentId = c.req.param("id");
+    
+    // Get document from database
+    const { data: document, error: fetchError } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("id", documentId)
+      .eq("user_id", userId)
+      .single();
+    
+    if (fetchError || !document) {
+      return c.json({ error: "Document not found" }, 404);
+    }
+    
+    // Generate signed URL (valid for 1 hour)
+    const { data: urlData, error: urlError } = await supabase.storage
+      .from("make-b5fd51b8-documents")
+      .createSignedUrl(document.file_path, 3600);
+    
+    if (urlError) {
+      console.error("Error generating signed URL:", urlError);
+      return c.json({ error: "Failed to generate download URL" }, 500);
+    }
+    
+    return c.json({ url: urlData.signedUrl });
+  } catch (error) {
+    console.error("Unexpected error in GET /documents/:id/url:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Delete a document
+app.delete("/make-server-b5fd51b8/documents/:id", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    const documentId = c.req.param("id");
+    
+    // Get document to find file path
+    const { data: document, error: fetchError } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("id", documentId)
+      .eq("user_id", userId)
+      .single();
+    
+    if (fetchError || !document) {
+      return c.json({ error: "Document not found" }, 404);
+    }
+    
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from("make-b5fd51b8-documents")
+      .remove([document.file_path]);
+    
+    if (storageError) {
+      console.error("Error deleting file from storage:", storageError);
+      // Continue anyway to delete database record
+    }
+    
+    // Delete from database
+    const { error: deleteError } = await supabase
+      .from("documents")
+      .delete()
+      .eq("id", documentId)
+      .eq("user_id", userId);
+    
+    if (deleteError) {
+      console.error("Error deleting document from database:", deleteError);
+      return c.json({ error: "Failed to delete document" }, 500);
+    }
+    
+    return c.json({ success: true, message: "Document deleted successfully" });
+  } catch (error) {
+    console.error("Unexpected error in DELETE /documents/:id:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // Get all documents for user
 app.get("/make-server-b5fd51b8/documents", verifyAuth, async (c) => {
   try {

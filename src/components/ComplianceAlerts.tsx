@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AlertTriangle,
   AlertCircle,
@@ -7,6 +7,7 @@ import {
   Clock,
   X,
 } from "lucide-react";
+import { alertAPI, type ComplianceAlert as APIAlert } from "../utils/api/client";
 
 interface Alert {
   id: string;
@@ -21,124 +22,83 @@ interface Alert {
   createdDate: string;
 }
 
-const mockAlerts: Alert[] = [
-  {
-    id: "1",
-    type: "critical",
-    title: "Nigerian Brokerage Statements Required",
-    description:
-      "Q3 2025 brokerage statements for Nigerian equity holdings must be uploaded to verify disposal transactions. Without these documents, we cannot accurately calculate your CGT liability.",
-    jurisdiction: "Nigeria",
-    deadline: "2025-12-05",
-    daysRemaining: 3,
-    actions: [
-      "Upload Q3 2025 brokerage statement",
-      "Verify all disposal transactions",
-      "Confirm cost basis for calculations",
-    ],
-    status: "open",
-    createdDate: "2025-11-20",
-  },
-  {
-    id: "2",
-    type: "critical",
-    title: "UK Self Assessment Deadline Approaching",
-    description:
-      "Your UK Self Assessment for tax year 2024/25 is due by 31 January 2025. All foreign income and capital gains must be declared to HMRC.",
-    jurisdiction: "United Kingdom",
-    deadline: "2025-01-31",
-    daysRemaining: 36,
-    actions: [
-      "Review draft tax return",
-      "Confirm all foreign income sources",
-      "Submit payment on account if required",
-    ],
-    status: "in-progress",
-    createdDate: "2025-11-01",
-  },
-  {
-    id: "3",
-    type: "warning",
-    title: "Oando Plc Disposal - Cost Basis Verification",
-    description:
-      "We've detected a disposal of Oando Plc shares worth £8,500. The system requires confirmation of the original cost basis to calculate accurate CGT.",
-    jurisdiction: "Nigeria",
-    deadline: "2025-12-09",
-    daysRemaining: 7,
-    actions: [
-      "Provide original purchase documentation",
-      "Confirm acquisition date and price",
-      "Update cost basis in system",
-    ],
-    status: "open",
-    createdDate: "2025-11-23",
-  },
-  {
-    id: "4",
-    type: "warning",
-    title: "Foreign Tax Credit Claim Available",
-    description:
-      "You paid ₦2,450,000 (£1,950 equivalent) in Nigerian CGT. You may be eligible to claim this as a foreign tax credit on your UK return to avoid double taxation.",
-    jurisdiction: "United Kingdom",
-    deadline: "2025-01-31",
-    daysRemaining: 36,
-    actions: [
-      "Obtain official receipt from Nigerian tax authority",
-      "Calculate foreign tax credit eligibility",
-      "Include in UK Self Assessment",
-    ],
-    status: "in-progress",
-    createdDate: "2025-11-15",
-  },
-  {
-    id: "5",
-    type: "info",
-    title: "Annual CGT Allowance Optimization",
-    description:
-      "You have £2,100 remaining in your UK CGT annual exemption (£3,000 for 2025/26). Consider realizing gains before the tax year ends on 5 April 2026.",
-    jurisdiction: "United Kingdom",
-    daysRemaining: 130,
-    actions: [
-      "Review portfolio for tax-loss harvesting opportunities",
-      "Identify assets with unrealized gains",
-      "Plan strategic disposals to maximize allowance",
-    ],
-    status: "open",
-    createdDate: "2025-11-18",
-  },
-  {
-    id: "6",
-    type: "info",
-    title: "DTA Treaty Benefits Review",
-    description:
-      "Our ML engine has identified potential additional DTA benefits for your UAE property holdings. A review could reduce your overall UK tax liability.",
-    jurisdiction: "UAE",
-    actions: [
-      "Review UAE property holding structure",
-      "Assess remittance basis eligibility",
-      "Consult with cross-border tax specialist if needed",
-    ],
-    status: "open",
-    createdDate: "2025-11-22",
-  },
-];
+// Transform API alert to display format
+function transformAlert(apiAlert: APIAlert): Alert {
+  const calculateDaysRemaining = (dueDate?: string) => {
+    if (!dueDate) return undefined;
+    const due = new Date(dueDate);
+    const today = new Date();
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Map API severity to display type
+  const typeMap: Record<string, "critical" | "warning" | "info"> = {
+    critical: "critical",
+    high: "critical",
+    medium: "warning",
+    low: "info",
+  };
+
+  return {
+    id: apiAlert.id,
+    type: typeMap[apiAlert.severity] || "info",
+    title: apiAlert.title,
+    description: apiAlert.description || "",
+    jurisdiction: "United Kingdom", // TODO: Extract from alert data
+    deadline: apiAlert.due_date,
+    daysRemaining: calculateDaysRemaining(apiAlert.due_date),
+    actions: [], // TODO: Extract from alert metadata
+    status: apiAlert.is_resolved ? "resolved" : apiAlert.is_read ? "in-progress" : "open",
+    createdDate: apiAlert.created_at.split('T')[0],
+  };
+}
 
 export const ComplianceAlerts: React.FC = () => {
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterJurisdiction, setFilterJurisdiction] = useState<string>("all");
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredAlerts = mockAlerts.filter((alert) => {
+  // Fetch alerts from API
+  useEffect(() => {
+    async function fetchAlerts() {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: apiError } = await alertAPI.getAll();
+
+      if (apiError) {
+        console.error("Error fetching alerts:", apiError);
+        setError("Failed to load alerts. Please try again.");
+        setAlerts([]);
+      } else if (data?.alerts) {
+        const transformedAlerts = data.alerts.map(transformAlert);
+        setAlerts(transformedAlerts);
+      } else {
+        setAlerts([]);
+      }
+
+      setLoading(false);
+    }
+
+    fetchAlerts();
+  }, []);
+
+  const filteredAlerts = alerts.filter((alert) => {
     const matchesType = filterType === "all" || alert.type === filterType;
     const matchesJurisdiction =
       filterJurisdiction === "all" || alert.jurisdiction === filterJurisdiction;
     return matchesType && matchesJurisdiction;
   });
 
-  const criticalCount = mockAlerts.filter((a) => a.type === "critical").length;
-  const warningCount = mockAlerts.filter((a) => a.type === "warning").length;
-  const infoCount = mockAlerts.filter((a) => a.type === "info").length;
-  const urgentCount = mockAlerts.filter(
+  const criticalCount = alerts.filter((a) => a.type === "critical").length;
+  const warningCount = alerts.filter((a) => a.type === "warning").length;
+  const infoCount = alerts.filter((a) => a.type === "info").length;
+  const urgentCount = alerts.filter(
     (a) => a.daysRemaining && a.daysRemaining <= 7
   ).length;
 
@@ -181,7 +141,7 @@ export const ComplianceAlerts: React.FC = () => {
 
   const jurisdictions = [
     "all",
-    ...Array.from(new Set(mockAlerts.map((a) => a.jurisdiction))),
+    ...Array.from(new Set(alerts.map((a) => a.jurisdiction))),
   ];
 
   return (
@@ -279,7 +239,7 @@ export const ComplianceAlerts: React.FC = () => {
         </div>
 
         <div className="ml-auto text-xs text-slate-400">
-          Showing {filteredAlerts.length} of {mockAlerts.length} alerts
+          Showing {filteredAlerts.length} of {alerts.length} alerts
         </div>
       </div>
 
