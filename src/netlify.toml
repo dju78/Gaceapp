@@ -9,6 +9,12 @@
   
   # Node version
   node_version = "18"
+  
+  # Environment variables for build
+  [build.environment]
+    # Tell Netlify's secret scanner to ignore public Supabase credentials
+    # The project ID and anon key are intentionally public (client-side)
+    SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_PROJECT_ID,VITE_SUPABASE_ANON_KEY"
 
 # SPA redirect rule - ensure all routes are handled by React Router
 [[redirects]]

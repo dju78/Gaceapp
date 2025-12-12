@@ -142,6 +142,24 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - **CORS Configuration** - Proper cross-origin security
 - **Password Authentication** - Supabase Auth integration
 
+### Public vs. Private Credentials
+
+This application follows Supabase's security model:
+
+**Public (Safe for Client-Side):**
+- `VITE_SUPABASE_PROJECT_ID` - The Supabase project identifier
+- `VITE_SUPABASE_ANON_KEY` - The public anonymous key (has RLS restrictions)
+
+These are intentionally exposed in the client-side code and are safe to include in version control.
+
+**Private (Server-Side Only):**
+- `SUPABASE_SERVICE_ROLE_KEY` - Full database access (bypasses RLS)
+- `SUPABASE_DB_URL` - Direct database connection string
+
+These are stored in Netlify/Supabase environment variables and never exposed to clients.
+
+For more information, see [Supabase API Keys Documentation](https://supabase.com/docs/guides/api/api-keys).
+
 ## 📁 Project Structure
 
 ```
