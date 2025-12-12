@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { NotificationPanel } from "./NotificationPanel";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { ProductTour, DASHBOARD_TOUR, useTour, TourButton } from "./tour/ProductTour";
 import {
   LayoutDashboard,
   Globe,
@@ -38,6 +39,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const { isTourOpen, startTour, closeTour, completeTour, hasCompletedTour } = useTour(DASHBOARD_TOUR);
   const [notifications, setNotifications] = useState([
     {
       id: "1",
@@ -235,6 +237,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Tour Button */}
+              {!hasCompletedTour && location.pathname === "/dashboard/overview" && (
+                <TourButton onClick={startTour} label="Take Tour" />
+              )}
+
               {/* Jurisdiction selector */}
               <div className="hidden items-center gap-2 rounded-full border border-indigo-500/30 bg-slate-900/50 px-4 py-2 text-xs text-slate-300 md:flex">
                 <span className="glow-cyan inline-flex h-2 w-2 rounded-full bg-cyan-400" />
@@ -295,6 +302,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
         {/* Section Content - Rendered by nested routes */}
         <main className="p-6">
+          <ProductTour 
+            steps={DASHBOARD_TOUR} 
+            isOpen={isTourOpen} 
+            onClose={closeTour}
+            onComplete={completeTour}
+          />
           <Outlet />
         </main>
       </div>

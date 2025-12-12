@@ -61,10 +61,17 @@ export const ComplianceOverview: React.FC = () => {
   return (
     <>
       <div className="mx-auto max-w-7xl">
+        {/* Welcome Section */}
+        <div data-tour="welcome" className="mb-6 p-6 rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 to-purple-500/10">
+          <h2 className="text-white mb-2">Welcome to GACE</h2>
+          <p className="text-white/60">Your intelligent Global Asset Compliance Engine for UK tax compliance.</p>
+        </div>
+
         {/* KPI Cards */}
         <section className="grid gap-4 md:grid-cols-4">
           {/* Portfolio Value */}
           <button
+            data-tour="portfolio-value"
             onClick={() => setModalOpen("portfolio")}
             className="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-left transition-all hover:border-indigo-500/50 hover:bg-slate-900"
           >
@@ -92,6 +99,7 @@ export const ComplianceOverview: React.FC = () => {
 
           {/* CGT Liability */}
           <button
+            data-tour="cgt-liability"
             onClick={() => setModalOpen("cgt")}
             className="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-left transition-all hover:border-indigo-500/50 hover:bg-slate-900"
           >

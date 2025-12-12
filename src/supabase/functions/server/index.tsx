@@ -4,6 +4,7 @@ import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js";
 import * as kv from "./kv_store.tsx";
 import adminRoutes from "./admin-routes.tsx";
+import { DEMO_USERS, generateDemoTaxCalculation, getDemoCredentialsSummary } from "./demo-data.tsx";
 
 const app = new Hono();
 
@@ -1047,6 +1048,259 @@ app.put("/make-server-b5fd51b8/alerts/:id/resolve", verifyAuth, async (c) => {
   } catch (error) {
     console.error("Unexpected error in PUT /alerts/:id/resolve:", error);
     return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// ==============================================
+// DEMO DATA SEEDING ROUTES
+// ==============================================
+
+// Get demo credentials (no auth required)
+app.get("/make-server-b5fd51b8/demo/credentials", (c) => {
+  return c.text(getDemoCredentialsSummary());
+});
+
+// Seed demo data (creates all demo users with assets)
+app.post("/make-server-b5fd51b8/demo/seed", async (c) => {
+  try {
+    console.log("[Demo] Starting demo data seeding...");
+    
+    const results = [];
+    const errors = [];
+    
+    for (const demoUser of DEMO_USERS) {
+      try {
+        console.log(`[Demo] Creating user: ${demoUser.email}`);
+        
+        // Check if user already exists
+        const { data: { users } } = await supabase.auth.admin.listUsers();
+        const existingUser = users.find((u) => u.email === demoUser.email);
+        
+        let userId: string;
+        
+        if (existingUser) {
+          console.log(`[Demo] User already exists: ${demoUser.email}, skipping auth creation`);
+          userId = existingUser.id;
+        } else {
+          // Create auth user with admin API
+          const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: demoUser.email,
+            password: demoUser.password,
+            user_metadata: {
+              full_name: demoUser.fullName,
+              user_type: demoUser.userType,
+              company_name: demoUser.companyName,
+            },
+            email_confirm: true,
+          });
+          
+          if (authError) {
+            console.error(`[Demo] Auth error for ${demoUser.email}:`, authError);
+            errors.push({ email: demoUser.email, error: authError.message });
+            continue;
+          }
+          
+          userId = authData.user!.id;
+          console.log(`[Demo] Created auth user: ${userId}`);
+        }
+        
+        // Check if profile exists
+        const { data: existingProfile } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+        
+        if (!existingProfile) {
+          // Create profile
+          const { error: profileError } = await supabase
+            .from("user_profiles")
+            .insert({
+              id: userId,
+              email: demoUser.email,
+              user_type: demoUser.userType,
+              full_name: demoUser.fullName,
+              company_name: demoUser.companyName || null,
+              has_completed_onboarding: true, // Mark demo users as onboarded
+              admin_role: demoUser.userType === "admin" ? "support" : null,
+            });
+          
+          if (profileError) {
+            console.error(`[Demo] Profile error for ${demoUser.email}:`, profileError);
+            errors.push({ email: demoUser.email, error: profileError.message });
+            continue;
+          }
+          console.log(`[Demo] Created profile for: ${demoUser.email}`);
+        } else {
+          console.log(`[Demo] Profile already exists for: ${demoUser.email}`);
+        }
+        
+        // Create assets
+        if (demoUser.assets.length > 0) {
+          // Check if assets already exist
+          const { data: existingAssets } = await supabase
+            .from("assets")
+            .select("id")
+            .eq("user_id", userId);
+          
+          if (!existingAssets || existingAssets.length === 0) {
+            const assetsToInsert = demoUser.assets.map((asset) => ({
+              user_id: userId,
+              ...asset,
+            }));
+            
+            const { error: assetsError } = await supabase
+              .from("assets")
+              .insert(assetsToInsert);
+            
+            if (assetsError) {
+              console.error(`[Demo] Assets error for ${demoUser.email}:`, assetsError);
+              errors.push({ email: demoUser.email, error: assetsError.message });
+            } else {
+              console.log(`[Demo] Created ${demoUser.assets.length} assets for: ${demoUser.email}`);
+            }
+          } else {
+            console.log(`[Demo] Assets already exist for: ${demoUser.email}`);
+          }
+          
+          // Create sample tax calculations for the last 2 years
+          const currentYear = new Date().getFullYear();
+          for (let year = currentYear - 1; year <= currentYear; year++) {
+            const { data: existingCalc } = await supabase
+              .from("tax_calculations")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("tax_year", year)
+              .maybeSingle();
+            
+            if (!existingCalc) {
+              const taxCalc = generateDemoTaxCalculation(userId, demoUser.assets, year);
+              
+              const { error: calcError } = await supabase
+                .from("tax_calculations")
+                .insert(taxCalc);
+              
+              if (calcError) {
+                console.error(`[Demo] Tax calc error for ${demoUser.email} year ${year}:`, calcError);
+              } else {
+                console.log(`[Demo] Created tax calculation for ${demoUser.email} year ${year}`);
+              }
+            }
+          }
+          
+          // Create sample compliance alerts
+          const { data: existingAlerts } = await supabase
+            .from("compliance_alerts")
+            .select("id")
+            .eq("user_id", userId);
+          
+          if (!existingAlerts || existingAlerts.length === 0) {
+            const alerts = [
+              {
+                user_id: userId,
+                alert_type: "deadline",
+                severity: "high",
+                title: "Self Assessment Deadline Approaching",
+                message: "Your Self Assessment tax return for 2024/25 is due by 31 January 2026. Ensure all foreign income is declared.",
+                is_read: false,
+                is_resolved: false,
+              },
+              {
+                user_id: userId,
+                alert_type: "compliance",
+                severity: "medium",
+                title: "Foreign Assets Over £100,000",
+                message: "Your overseas assets exceed £100,000. You may need to complete additional HMRC forms for offshore reporting.",
+                is_read: false,
+                is_resolved: false,
+              },
+            ];
+            
+            const { error: alertsError } = await supabase
+              .from("compliance_alerts")
+              .insert(alerts);
+            
+            if (alertsError) {
+              console.error(`[Demo] Alerts error for ${demoUser.email}:`, alertsError);
+            } else {
+              console.log(`[Demo] Created ${alerts.length} alerts for: ${demoUser.email}`);
+            }
+          }
+        }
+        
+        results.push({
+          email: demoUser.email,
+          userId,
+          assetsCreated: demoUser.assets.length,
+          scenario: demoUser.scenario,
+        });
+        
+      } catch (userError) {
+        console.error(`[Demo] Error processing user ${demoUser.email}:`, userError);
+        errors.push({ email: demoUser.email, error: String(userError) });
+      }
+    }
+    
+    console.log(`[Demo] Seeding complete. Success: ${results.length}, Errors: ${errors.length}`);
+    
+    return c.json({
+      success: true,
+      message: `Demo data seeded successfully`,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
+      credentials: getDemoCredentialsSummary(),
+    });
+    
+  } catch (error) {
+    console.error("[Demo] Unexpected error in demo seeding:", error);
+    return c.json({ error: "Internal server error during demo seeding" }, 500);
+  }
+});
+
+// Clear all demo data (for cleanup)
+app.post("/make-server-b5fd51b8/demo/clear", async (c) => {
+  try {
+    console.log("[Demo] Clearing all demo data...");
+    
+    const results = [];
+    
+    for (const demoUser of DEMO_USERS) {
+      try {
+        // Find user
+        const { data: { users } } = await supabase.auth.admin.listUsers();
+        const user = users.find((u) => u.email === demoUser.email);
+        
+        if (user) {
+          // Delete related data first (cascading should handle some of this)
+          await supabase.from("assets").delete().eq("user_id", user.id);
+          await supabase.from("tax_calculations").delete().eq("user_id", user.id);
+          await supabase.from("compliance_alerts").delete().eq("user_id", user.id);
+          await supabase.from("documents").delete().eq("user_id", user.id);
+          await supabase.from("user_profiles").delete().eq("id", user.id);
+          
+          // Delete auth user
+          await supabase.auth.admin.deleteUser(user.id);
+          
+          console.log(`[Demo] Deleted user: ${demoUser.email}`);
+          results.push({ email: demoUser.email, deleted: true });
+        } else {
+          results.push({ email: demoUser.email, deleted: false, reason: "not found" });
+        }
+      } catch (userError) {
+        console.error(`[Demo] Error deleting user ${demoUser.email}:`, userError);
+        results.push({ email: demoUser.email, deleted: false, error: String(userError) });
+      }
+    }
+    
+    return c.json({
+      success: true,
+      message: "Demo data cleared",
+      results,
+    });
+    
+  } catch (error) {
+    console.error("[Demo] Unexpected error in demo clearing:", error);
+    return c.json({ error: "Internal server error during demo clearing" }, 500);
   }
 });
 
