@@ -20,6 +20,7 @@ import { HMRCReports } from "./components/HMRCReports";
 import { HelpDocumentation } from "./components/HelpDocumentation";
 import { DocumentIngestion } from "./components/DocumentIngestion";
 import { AssetManager } from "./components/AssetManager";
+import { SelfAssessmentReport } from "./components/SelfAssessmentReport";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { NotFoundPage } from "./components/NotFoundPage";
 import { RouteDebugger } from "./components/RouteDebugger";
@@ -189,6 +190,7 @@ const AppRoutes: React.FC = () => {
         <Route path="reports" element={<HMRCReports userRole={user?.user_type || "end-user"} />} />
         <Route path="documents" element={<DocumentIngestion userRole={user?.user_type || "end-user"} />} />
         <Route path="assets" element={<AssetManager userRole={user?.user_type || "end-user"} />} />
+        <Route path="self-assessment" element={<SelfAssessmentReport />} />
         <Route path="help" element={<HelpDocumentation />} />
       </Route>
 

@@ -5,6 +5,8 @@ import { createClient } from "npm:@supabase/supabase-js";
 import * as kv from "./kv_store.tsx";
 import adminRoutes from "./admin-routes.tsx";
 import { DEMO_USERS, generateDemoTaxCalculation, getDemoCredentialsSummary } from "./demo-data.tsx";
+import { handlePdfGeneration } from "./pdf-generator.tsx";
+import { seedSampleData, getSampleReportData } from "./seed-data.tsx";
 
 const app = new Hono();
 
@@ -33,18 +35,26 @@ async function verifyAuth(c: any, next: any) {
   const authHeader = c.req.header("Authorization");
   
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.error("Auth verification failed: Missing or invalid authorization header");
     return c.json({ error: "Missing or invalid authorization header" }, 401);
   }
 
   const token = authHeader.replace("Bearer ", "");
+  console.log("Verifying token (first 30 chars):", token.substring(0, 30) + "...");
   
   const { data: { user }, error } = await supabase.auth.getUser(token);
   
   if (error || !user) {
     console.error("Auth verification error:", error);
-    return c.json({ error: "Unauthorized" }, 401);
+    console.error("Error details:", {
+      message: error?.message,
+      status: error?.status,
+      name: error?.name
+    });
+    return c.json({ error: "Unauthorized", details: error?.message || "Invalid token" }, 401);
   }
   
+  console.log("Auth verification successful for user:", user.id);
   c.set("userId", user.id);
   c.set("user", user);
   await next();
@@ -55,16 +65,66 @@ app.get("/make-server-b5fd51b8/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Debug endpoint - Check environment variables (DO NOT USE IN PRODUCTION)
-app.get("/make-server-b5fd51b8/debug/env", (c) => {
-  return c.json({
-    hasSupabaseUrl: !!Deno.env.get("SUPABASE_URL"),
-    hasServiceRoleKey: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-    hasAnonKey: !!Deno.env.get("SUPABASE_ANON_KEY"),
-    hasDbUrl: !!Deno.env.get("SUPABASE_DB_URL"),
-    supabaseUrlPreview: Deno.env.get("SUPABASE_URL")?.substring(0, 30) + "...",
-    denoVersion: Deno.version.deno,
-  });
+// Test auth endpoint - checks if a token is valid without using middleware
+app.post("/make-server-b5fd51b8/test-auth", async (c) => {
+  try {
+    const authHeader = c.req.header("Authorization");
+    
+    if (!authHeader) {
+      return c.json({ 
+        valid: false, 
+        error: "No Authorization header provided",
+        hint: "Include 'Authorization: Bearer <token>' header"
+      });
+    }
+
+    if (!authHeader.startsWith("Bearer ")) {
+      return c.json({ 
+        valid: false, 
+        error: "Invalid Authorization format",
+        hint: "Must start with 'Bearer '",
+        received: authHeader.substring(0, 20)
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    console.log("Testing token (first 30 chars):", token.substring(0, 30) + "...");
+    console.log("Token length:", token.length);
+    
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error) {
+      return c.json({ 
+        valid: false, 
+        error: error.message,
+        errorName: error.name,
+        errorStatus: error.status,
+        tokenPreview: token.substring(0, 30) + "..."
+      });
+    }
+    
+    if (!user) {
+      return c.json({ 
+        valid: false, 
+        error: "No user found for token"
+      });
+    }
+    
+    return c.json({ 
+      valid: true, 
+      userId: user.id,
+      email: user.email,
+      message: "Token is valid!"
+    });
+    
+  } catch (error) {
+    console.error("Error in test-auth:", error);
+    return c.json({ 
+      valid: false, 
+      error: "Internal server error",
+      details: String(error)
+    }, 500);
+  }
 });
 
 // ==============================================
@@ -677,6 +737,80 @@ app.get("/make-server-b5fd51b8/tax/history", verifyAuth, async (c) => {
   } catch (error) {
     console.error("Unexpected error in GET /tax/history:", error);
     return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// Generate Self Assessment PDF
+app.post("/make-server-b5fd51b8/tax/generate-pdf", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    const user = c.get("user");
+    const body = await c.req.json();
+    
+    console.log(`[PDF] Generating PDF for user ${userId}, tax year ${body.taxYear}`);
+    
+    // Get tax calculation for the specified year
+    const taxYearStr = `${body.taxYear || new Date().getFullYear()}/${(body.taxYear || new Date().getFullYear()) + 1}`;
+    
+    const { data: calculation, error: calcError } = await supabase
+      .from("tax_calculations")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("tax_year", taxYearStr)
+      .maybeSingle();
+    
+    if (calcError) {
+      console.error("[PDF] Error fetching calculation:", calcError);
+      return c.json({ error: "Failed to fetch tax calculation" }, 500);
+    }
+    
+    if (!calculation) {
+      console.log("[PDF] No calculation found for tax year:", taxYearStr);
+      return c.json({ error: "No tax calculation found for this year" }, 404);
+    }
+    
+    // Get latest snapshot
+    const { data: snapshot, error: snapError } = await supabase
+      .from("tax_calculation_snapshots")
+      .select("*")
+      .eq("calculation_id", calculation.id)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (snapError || !snapshot) {
+      console.error("[PDF] Error fetching snapshot:", snapError);
+      return c.json({ error: "No calculation snapshot found" }, 404);
+    }
+    
+    console.log(`[PDF] Found snapshot version ${snapshot.version} for calculation ${calculation.id}`);
+    
+    // Use handlePdfGeneration to get HTML
+    const result = await handlePdfGeneration(calculation.id, userId);
+    
+    if (!result.success || !result.html) {
+      console.error("[PDF] Failed to generate HTML:", result.error);
+      return c.json({ error: result.error || "Failed to generate PDF" }, 500);
+    }
+    
+    console.log("[PDF] HTML generated successfully, returning to client");
+    
+    // Return HTML and snapshot for client-side processing
+    return c.json({
+      success: true,
+      html: result.html,
+      snapshot: result.snapshot,
+      calculation: {
+        id: calculation.id,
+        tax_year: calculation.tax_year,
+        status: calculation.status,
+        total_tax_due: calculation.total_tax_due,
+        amount_due_by_31jan: calculation.amount_due_by_31jan,
+      },
+    });
+  } catch (error) {
+    console.error("Unexpected error in POST /tax/generate-pdf:", error);
+    return c.json({ error: "Internal server error", details: String(error) }, 500);
   }
 });
 
@@ -1301,6 +1435,248 @@ app.post("/make-server-b5fd51b8/demo/clear", async (c) => {
   } catch (error) {
     console.error("[Demo] Unexpected error in demo clearing:", error);
     return c.json({ error: "Internal server error during demo clearing" }, 500);
+  }
+});
+
+// Seed sample data (for testing purposes)
+app.post("/make-server-b5fd51b8/sample/seed", async (c) => {
+  try {
+    console.log("[Sample] Starting sample data seeding...");
+    
+    const results = [];
+    const errors = [];
+    
+    for (const sampleUser of DEMO_USERS) {
+      try {
+        console.log(`[Sample] Creating user: ${sampleUser.email}`);
+        
+        // Check if user already exists
+        const { data: { users } } = await supabase.auth.admin.listUsers();
+        const existingUser = users.find((u) => u.email === sampleUser.email);
+        
+        let userId: string;
+        
+        if (existingUser) {
+          console.log(`[Sample] User already exists: ${sampleUser.email}, skipping auth creation`);
+          userId = existingUser.id;
+        } else {
+          // Create auth user with admin API
+          const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: sampleUser.email,
+            password: sampleUser.password,
+            user_metadata: {
+              full_name: sampleUser.fullName,
+              user_type: sampleUser.userType,
+              company_name: sampleUser.companyName,
+            },
+            email_confirm: true,
+          });
+          
+          if (authError) {
+            console.error(`[Sample] Auth error for ${sampleUser.email}:`, authError);
+            errors.push({ email: sampleUser.email, error: authError.message });
+            continue;
+          }
+          
+          userId = authData.user!.id;
+          console.log(`[Sample] Created auth user: ${userId}`);
+        }
+        
+        // Check if profile exists
+        const { data: existingProfile } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+        
+        if (!existingProfile) {
+          // Create profile
+          const { error: profileError } = await supabase
+            .from("user_profiles")
+            .insert({
+              id: userId,
+              email: sampleUser.email,
+              user_type: sampleUser.userType,
+              full_name: sampleUser.fullName,
+              company_name: sampleUser.companyName || null,
+              has_completed_onboarding: true, // Mark demo users as onboarded
+              admin_role: sampleUser.userType === "admin" ? "support" : null,
+            });
+          
+          if (profileError) {
+            console.error(`[Sample] Profile error for ${sampleUser.email}:`, profileError);
+            errors.push({ email: sampleUser.email, error: profileError.message });
+            continue;
+          }
+          console.log(`[Sample] Created profile for: ${sampleUser.email}`);
+        } else {
+          console.log(`[Sample] Profile already exists for: ${sampleUser.email}`);
+        }
+        
+        // Create assets
+        if (sampleUser.assets.length > 0) {
+          // Check if assets already exist
+          const { data: existingAssets } = await supabase
+            .from("assets")
+            .select("id")
+            .eq("user_id", userId);
+          
+          if (!existingAssets || existingAssets.length === 0) {
+            const assetsToInsert = sampleUser.assets.map((asset) => ({
+              user_id: userId,
+              ...asset,
+            }));
+            
+            const { error: assetsError } = await supabase
+              .from("assets")
+              .insert(assetsToInsert);
+            
+            if (assetsError) {
+              console.error(`[Sample] Assets error for ${sampleUser.email}:`, assetsError);
+              errors.push({ email: sampleUser.email, error: assetsError.message });
+            } else {
+              console.log(`[Sample] Created ${sampleUser.assets.length} assets for: ${sampleUser.email}`);
+            }
+          } else {
+            console.log(`[Sample] Assets already exist for: ${sampleUser.email}`);
+          }
+          
+          // Create sample tax calculations for the last 2 years
+          const currentYear = new Date().getFullYear();
+          for (let year = currentYear - 1; year <= currentYear; year++) {
+            const { data: existingCalc } = await supabase
+              .from("tax_calculations")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("tax_year", year)
+              .maybeSingle();
+            
+            if (!existingCalc) {
+              const taxCalc = generateDemoTaxCalculation(userId, sampleUser.assets, year);
+              
+              const { error: calcError } = await supabase
+                .from("tax_calculations")
+                .insert(taxCalc);
+              
+              if (calcError) {
+                console.error(`[Sample] Tax calc error for ${sampleUser.email} year ${year}:`, calcError);
+              } else {
+                console.log(`[Sample] Created tax calculation for ${sampleUser.email} year ${year}`);
+              }
+            }
+          }
+          
+          // Create sample compliance alerts
+          const { data: existingAlerts } = await supabase
+            .from("compliance_alerts")
+            .select("id")
+            .eq("user_id", userId);
+          
+          if (!existingAlerts || existingAlerts.length === 0) {
+            const alerts = [
+              {
+                user_id: userId,
+                alert_type: "deadline",
+                severity: "high",
+                title: "Self Assessment Deadline Approaching",
+                message: "Your Self Assessment tax return for 2024/25 is due by 31 January 2026. Ensure all foreign income is declared.",
+                is_read: false,
+                is_resolved: false,
+              },
+              {
+                user_id: userId,
+                alert_type: "compliance",
+                severity: "medium",
+                title: "Foreign Assets Over £100,000",
+                message: "Your overseas assets exceed £100,000. You may need to complete additional HMRC forms for offshore reporting.",
+                is_read: false,
+                is_resolved: false,
+              },
+            ];
+            
+            const { error: alertsError } = await supabase
+              .from("compliance_alerts")
+              .insert(alerts);
+            
+            if (alertsError) {
+              console.error(`[Sample] Alerts error for ${sampleUser.email}:`, alertsError);
+            } else {
+              console.log(`[Sample] Created ${alerts.length} alerts for: ${sampleUser.email}`);
+            }
+          }
+        }
+        
+        results.push({
+          email: sampleUser.email,
+          userId,
+          assetsCreated: sampleUser.assets.length,
+          scenario: sampleUser.scenario,
+        });
+        
+      } catch (userError) {
+        console.error(`[Sample] Error processing user ${sampleUser.email}:`, userError);
+        errors.push({ email: sampleUser.email, error: String(userError) });
+      }
+    }
+    
+    console.log(`[Sample] Seeding complete. Success: ${results.length}, Errors: ${errors.length}`);
+    
+    return c.json({
+      success: true,
+      message: `Sample data seeded successfully`,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
+      credentials: getDemoCredentialsSummary(),
+    });
+    
+  } catch (error) {
+    console.error("[Sample] Unexpected error in sample seeding:", error);
+    return c.json({ error: "Internal server error during sample seeding" }, 500);
+  }
+});
+
+// Get sample report data (for testing purposes)
+app.get("/make-server-b5fd51b8/sample/report-data", (c) => {
+  return c.json(getSampleReportData());
+});
+
+// Seed sample data for authenticated user
+app.post("/make-server-b5fd51b8/seed/populate", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    console.log(`[Seed] Populating sample data for user: ${userId}`);
+    
+    const result = await seedSampleData(userId);
+    
+    return c.json({
+      success: true,
+      message: "Sample data populated successfully",
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("[Seed] Error populating sample data:", error);
+    return c.json({ 
+      error: "Failed to populate sample data", 
+      details: String(error) 
+    }, 500);
+  }
+});
+
+// Get comprehensive sample report data for authenticated user
+app.get("/make-server-b5fd51b8/seed/report-data", verifyAuth, async (c) => {
+  try {
+    const userId = c.get("userId");
+    console.log(`[Seed] Fetching report data for user: ${userId}`);
+    
+    const reportData = await getSampleReportData(userId);
+    
+    return c.json(reportData);
+  } catch (error) {
+    console.error("[Seed] Error fetching report data:", error);
+    return c.json({ 
+      error: "Failed to fetch report data", 
+      details: String(error) 
+    }, 500);
   }
 });
 

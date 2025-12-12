@@ -16,6 +16,7 @@ import {
   User,
   LogOut,
   Building2,
+  FileBarChart,
 } from "lucide-react";
 
 type UserType = "end-user" | "accountant" | "admin";
@@ -112,6 +113,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       path: "/dashboard/reports",
       label: "HMRC Reports",
       icon: FileText,
+    },
+    {
+      path: "/dashboard/self-assessment",
+      label: "Self Assessment",
+      icon: FileBarChart,
     },
     {
       path: "/dashboard/help",

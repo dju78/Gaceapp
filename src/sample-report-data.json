@@ -1,0 +1,374 @@
+{
+  "user": {
+    "id": "REPLACE_WITH_YOUR_USER_ID",
+    "name": "Sarah Mitchell",
+    "email": "sarah.mitchell@example.com",
+    "role": "client",
+    "nino": "AB123456C",
+    "utr": "1234567890",
+    "address": {
+      "line1": "45 Kensington Gardens",
+      "line2": "Flat 3B",
+      "city": "London",
+      "postcode": "W2 4QH",
+      "country": "United Kingdom"
+    }
+  },
+  "taxYear": "2024/2025",
+  "reportGeneratedDate": "2025-12-12T14:30:00Z",
+  "assets": [
+    {
+      "id": "asset_001",
+      "name": "Rental Property - Barcelona Apartment",
+      "type": "Property",
+      "country": "Spain",
+      "value": 285000,
+      "currency": "EUR",
+      "valueGBP": 245000,
+      "acquisitionDate": "2021-03-15",
+      "income": {
+        "gross": 18500,
+        "grossGBP": 15900,
+        "expenses": 4200,
+        "expensesGBP": 3600,
+        "net": 14300,
+        "netGBP": 12300,
+        "foreignTaxPaid": 2145,
+        "foreignTaxPaidGBP": 1845
+      }
+    },
+    {
+      "id": "asset_002",
+      "name": "US Investment Portfolio",
+      "type": "Securities",
+      "country": "United States",
+      "value": 125000,
+      "currency": "USD",
+      "valueGBP": 98000,
+      "acquisitionDate": "2020-06-10",
+      "income": {
+        "dividends": 4500,
+        "dividendsGBP": 3530,
+        "capitalGains": 8200,
+        "capitalGainsGBP": 6430,
+        "foreignTaxPaid": 675,
+        "foreignTaxPaidGBP": 530
+      }
+    },
+    {
+      "id": "asset_003",
+      "name": "Dubai Commercial Property",
+      "type": "Property",
+      "country": "United Arab Emirates",
+      "value": 450000,
+      "currency": "AED",
+      "valueGBP": 95000,
+      "acquisitionDate": "2022-11-20",
+      "income": {
+        "gross": 24000,
+        "grossGBP": 5080,
+        "expenses": 3600,
+        "expensesGBP": 760,
+        "net": 20400,
+        "netGBP": 4320,
+        "foreignTaxPaid": 0,
+        "foreignTaxPaidGBP": 0
+      }
+    },
+    {
+      "id": "asset_004",
+      "name": "Singapore Bank Account",
+      "type": "Bank Account",
+      "country": "Singapore",
+      "value": 75000,
+      "currency": "SGD",
+      "valueGBP": 44000,
+      "acquisitionDate": "2019-01-05",
+      "income": {
+        "interest": 1875,
+        "interestGBP": 1100,
+        "foreignTaxPaid": 0,
+        "foreignTaxPaidGBP": 0
+      }
+    }
+  ],
+  "incomeBreakdown": {
+    "ukEmployment": {
+      "gross": 85000,
+      "taxPaid": 22340,
+      "niPaid": 5540
+    },
+    "overseasIncome": {
+      "rentalIncome": 16620,
+      "dividends": 3530,
+      "interest": 1100,
+      "total": 21250
+    },
+    "capitalGains": {
+      "uk": 0,
+      "overseas": 6430,
+      "total": 6430
+    }
+  },
+  "taxCalculation": {
+    "totalIncome": 106250,
+    "personalAllowance": 12570,
+    "taxableIncome": 93680,
+    "ukTaxBreakdown": {
+      "basicRate": {
+        "amount": 37700,
+        "rate": 0.20,
+        "tax": 7540
+      },
+      "higherRate": {
+        "amount": 55980,
+        "rate": 0.40,
+        "tax": 22392
+      },
+      "additionalRate": {
+        "amount": 0,
+        "rate": 0.45,
+        "tax": 0
+      },
+      "totalIncomeTax": 29932
+    },
+    "capitalGainsTax": {
+      "taxableGains": 6430,
+      "annualExemption": 3000,
+      "taxableAmount": 3430,
+      "rate": 0.20,
+      "tax": 686
+    },
+    "nationalInsurance": 5540,
+    "totalUKTaxLiability": 36158,
+    "foreignTaxCredit": {
+      "spain": 1845,
+      "usa": 530,
+      "uae": 0,
+      "singapore": 0,
+      "total": 2375
+    },
+    "netTaxPayable": 33783,
+    "taxAlreadyPaid": 22340,
+    "balanceDue": 11443
+  },
+  "doubleTaxationAgreements": [
+    {
+      "country": "Spain",
+      "applied": true,
+      "relief": 1845,
+      "method": "Credit Method",
+      "articles": "Articles 6, 10, 23",
+      "note": "UK-Spain DTA allows credit for foreign tax paid on rental income"
+    },
+    {
+      "country": "United States",
+      "applied": true,
+      "relief": 530,
+      "method": "Credit Method",
+      "articles": "Articles 10, 13, 24",
+      "note": "15% withholding tax on dividends under treaty"
+    },
+    {
+      "country": "United Arab Emirates",
+      "applied": true,
+      "relief": 0,
+      "method": "Exemption Method",
+      "articles": "Article 6",
+      "note": "UAE has no income tax on rental income, but must still be declared in UK"
+    },
+    {
+      "country": "Singapore",
+      "applied": true,
+      "relief": 0,
+      "method": "Credit Method",
+      "articles": "Article 11",
+      "note": "No withholding tax on interest for non-residents"
+    }
+  ],
+  "complianceChecks": [
+    {
+      "requirement": "SA100 Self Assessment",
+      "status": "Required",
+      "deadline": "2026-01-31",
+      "completed": false,
+      "priority": "High",
+      "description": "Main Self Assessment tax return form"
+    },
+    {
+      "requirement": "SA106 Foreign Income",
+      "status": "Required",
+      "deadline": "2026-01-31",
+      "completed": false,
+      "priority": "High",
+      "description": "Supplementary pages for foreign income from all 4 countries"
+    },
+    {
+      "requirement": "SA108 Capital Gains",
+      "status": "Required",
+      "deadline": "2026-01-31",
+      "completed": false,
+      "priority": "High",
+      "description": "Capital gains from US investment portfolio disposal"
+    },
+    {
+      "requirement": "Trust Registration Service",
+      "status": "Not Required",
+      "deadline": null,
+      "completed": null,
+      "priority": "N/A",
+      "description": "Not applicable - no trust structures involved"
+    },
+    {
+      "requirement": "Foreign Assets over £100k Reporting",
+      "status": "Required",
+      "deadline": "2026-01-31",
+      "completed": false,
+      "priority": "Medium",
+      "description": "Total foreign assets £482,000 - offshore disclosure required"
+    }
+  ],
+  "aiInsights": [
+    {
+      "category": "Tax Relief",
+      "severity": "info",
+      "title": "Spanish Property DTA Relief",
+      "message": "Your Spanish rental property qualifies for double taxation relief under the UK-Spain DTA Article 6. Foreign tax credit of £1,845 has been applied.",
+      "actionRequired": false
+    },
+    {
+      "category": "Tax Relief",
+      "severity": "info",
+      "title": "US Dividend Withholding",
+      "message": "US dividend income is subject to 15% withholding tax under the UK-US treaty. You may claim foreign tax credit of £530.",
+      "actionRequired": false
+    },
+    {
+      "category": "Compliance",
+      "severity": "warning",
+      "title": "Dubai Income Declaration",
+      "message": "Your Dubai property income is exempt from UAE tax. No foreign tax credit available, but income must still be declared in UK.",
+      "actionRequired": true
+    },
+    {
+      "category": "Reporting",
+      "severity": "warning",
+      "title": "Foreign Assets Threshold",
+      "message": "Total overseas assets exceed £100,000 - ensure all foreign income is reported on SA106 and consider offshore tax disclosure requirements.",
+      "actionRequired": true
+    },
+    {
+      "category": "Optimization",
+      "severity": "info",
+      "title": "Pension Contribution Opportunity",
+      "message": "Consider pension contributions to reduce higher rate tax liability of £22,392. £1 contributed saves 40p in tax.",
+      "actionRequired": false
+    },
+    {
+      "category": "Tax Planning",
+      "severity": "info",
+      "title": "Remittance Basis Consideration",
+      "message": "You may benefit from remittance basis election if you're non-UK domiciled (not applied in this calculation). Consult a tax advisor.",
+      "actionRequired": false
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc_001",
+      "name": "Spanish Rental Income Statement 2024.pdf",
+      "type": "Income Statement",
+      "country": "Spain",
+      "uploadDate": "2025-11-15T10:30:00Z",
+      "status": "Verified",
+      "fileSize": 245678,
+      "metadata": {
+        "taxYear": "2024",
+        "assetType": "property",
+        "ocrCompleted": true
+      }
+    },
+    {
+      "id": "doc_002",
+      "name": "US 1099-DIV Form.pdf",
+      "type": "Tax Certificate",
+      "country": "United States",
+      "uploadDate": "2025-10-22T14:15:00Z",
+      "status": "Verified",
+      "fileSize": 123456,
+      "metadata": {
+        "taxYear": "2024",
+        "assetType": "securities",
+        "ocrCompleted": true
+      }
+    },
+    {
+      "id": "doc_003",
+      "name": "Dubai Rental Agreement.pdf",
+      "type": "Contract",
+      "country": "United Arab Emirates",
+      "uploadDate": "2025-09-08T09:45:00Z",
+      "status": "Verified",
+      "fileSize": 567890,
+      "metadata": {
+        "assetType": "property",
+        "ocrCompleted": true
+      }
+    }
+  ],
+  "nextSteps": [
+    {
+      "priority": 1,
+      "action": "File SA100 Self Assessment by 31 January 2026",
+      "deadline": "2026-01-31",
+      "description": "Complete and submit main Self Assessment tax return",
+      "estimatedTime": "2-3 hours"
+    },
+    {
+      "priority": 2,
+      "action": "Complete SA106 Foreign Income pages for all overseas income",
+      "deadline": "2026-01-31",
+      "description": "Declare income from Spain, USA, UAE, and Singapore",
+      "estimatedTime": "1-2 hours"
+    },
+    {
+      "priority": 3,
+      "action": "Submit SA108 for US capital gains declaration",
+      "deadline": "2026-01-31",
+      "description": "Report capital gains from US investment portfolio",
+      "estimatedTime": "30 minutes"
+    },
+    {
+      "priority": 4,
+      "action": "Pay balance of £11,443 by 31 January 2026 to avoid penalties",
+      "deadline": "2026-01-31",
+      "description": "Payment can be made via HMRC online, bank transfer, or debit card",
+      "estimatedTime": "15 minutes"
+    },
+    {
+      "priority": 5,
+      "action": "Consider setting up payment on account for next tax year",
+      "deadline": "2026-01-31",
+      "description": "Two payments of £5,722 each (50% of this year's liability)",
+      "estimatedTime": "10 minutes"
+    },
+    {
+      "priority": 6,
+      "action": "Review double taxation treaty positions annually",
+      "deadline": "Ongoing",
+      "description": "Monitor changes to DTA agreements and ensure optimal tax relief",
+      "estimatedTime": "Ongoing"
+    }
+  ],
+  "summary": {
+    "totalAssets": 4,
+    "totalAssetValue": 482000,
+    "totalOverseasIncome": 21250,
+    "totalUKIncome": 85000,
+    "totalForeignTaxPaid": 2375,
+    "totalUKTaxDue": 36158,
+    "balanceOwed": 11443,
+    "countriesInvolved": ["Spain", "United States", "United Arab Emirates", "Singapore"],
+    "dtaAgreementsApplied": 4,
+    "complianceFormsRequired": ["SA100", "SA106", "SA108"]
+  }
+}
