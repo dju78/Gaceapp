@@ -2,7 +2,7 @@
 
 [build]
   # Build command - use production build without type checking
-  command = "npm run build:prod"
+  command = "vite build --outDir dist"
   
   # Publish directory (Vite outputs to dist)
   publish = "dist"

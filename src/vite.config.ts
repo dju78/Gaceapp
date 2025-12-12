@@ -10,7 +10,7 @@ const __dirname = dirname(__filename)
 export default defineConfig({
   plugins: [react()],
   
-  // Ensure output goes to dist directory
+  // Ensure output goes to dist directory (NOT build)
   build: {
     outDir: 'dist',
     emptyOutDir: true,
