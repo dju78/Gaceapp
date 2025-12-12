@@ -9,3 +9,9 @@
   
   # Node version
   node_version = "18"
+
+# SPA redirect rule - ensure all routes are handled by React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
